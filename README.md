@@ -1,10 +1,10 @@
-# DevOps Jokes App
+# "Qoutes" App
 
-A simple web application to view, add, edit, and delete DevOps jokes and motivational quotes. Built with Python (Flask), HTML, CSS, and Prometheus metrics for monitoring.
+A simple web application to view, add, edit, and delete motivational quotes. Built with Python (Flask), HTML, CSS, and Prometheus metrics for monitoring.
 
 ## Features
 
-- **View all quotes/jokes**
+- **View all quotes**
 - **Get a random quote**
 - **Add new quotes**
 - **Edit existing quotes**
