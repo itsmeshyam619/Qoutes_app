@@ -30,7 +30,7 @@ A simple web application to view, add, edit, and delete DevOps jokes and motivat
 
 1. Clone the repository:
     ```shell
-    git clone https://github.com/itsmeshyam619/devops-jokes-app.git
+    git clone https://github.com/itsmeshyam619/Qoutes_app.git
     cd devops-jokes-app
     ```
 
@@ -47,6 +47,7 @@ A simple web application to view, add, edit, and delete DevOps jokes and motivat
 4. Open your browser and go to [http://localhost:5000](http://localhost:5000)
 
 ## API Endpoints
+initially these endpoints are used for generating random jokes , so read the code once before you modify it..
 
 - `GET /jokes` — Get all quotes
 - `GET /jokes/random` — Get a random quote
