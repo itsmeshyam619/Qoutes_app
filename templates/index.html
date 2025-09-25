@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>" Qoutes " — CRUD </title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="randomQouteDisplay" class="random-qoute-display">
+    <span>Loading random qoute...</span>
+  </div>
+  <div class="container">
+    <header>
+      <h1>"Qoutes" ..</h1>
+      <div class="controls">
+        <input id="searchInput" placeholder="Search qoutes..." oninput="renderTable()" />
+        <label>
+          Auto-refresh
+          <input type="checkbox" id="autoRefresh" />
+        </label>
+      </div>
+    </header>
+
+    <section class="add-section">
+      <h2>Add a new " Qoute "</h2>
+      <textarea id="newQouteText" rows="2" placeholder="Type a new joke..."></textarea>
+      <div>
+        <button id="addBtn" onclick="addQoute()">Add Qoute</button>
+      </div>
+      <div id="formError" class="error" style="display:none;"></div>
+    </section>
+
+    <section class="table-section">
+      <div class="table-top">
+        <div>Total "Qoutes": <span id="totalCount">0</span></div>
+        <div>
+          Page size:
+          <select id="pageSize" onchange="renderTable()">
+            <option>5</option><option>10</option><option>20</option>
+          </select>
+        </div>
+      </div>
+
+      <table id="jokesTable">
+        <thead>
+          <tr>
+            <th onclick="toggleSort()">ID <span id="sortDir">↓</span></th>
+            <th>Qoute</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody ></tbody>
+      </table>
+
+      <div class="pagination">
+        <button onclick="prevPage()">Prev</button>
+        <span>Page <span id="pageNum">1</span></span>
+        <button onclick="nextPage()">Next</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="editModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Edit Qoute <span id="editId"></span></h3>
+      <textarea id="editText" rows="3"></textarea>
+      <div class="modal-actions">
+        <button onclick="saveEdit()">Save</button>
+        <button onclick="closeEdit()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script>
+    let jokesData = [];
+    let page = 1;
+    let sortAsc = false;
+    let autoRefreshTimer = null;
+    let randomQouteTimer = null;
+
+    async function fetchQoutes() {
+      try {
+        const res = await fetch('/jokes');
+        jokesData = await res.json();
+        page = 1;
+        document.getElementById('totalCount').textContent = jokesData.length;
+        renderTable();
+        showRandomQoute();
+      } catch (e) {
+        showToast('Error fetching jokes');
+        console.error(e);
+      }
+    }
+    function showRandomQoute() {
+      const el = document.getElementById('randomQouteDisplay');
+      const span = el.querySelector('span');
+      if (!jokesData.length) {
+        span.textContent = 'No qoutes available.';
+        return;
+      }
+      const idx = Math.floor(Math.random() * jokesData.length);
+      span.textContent = jokesData[idx].text;
+    }
+
+    // Random qoute auto-refresh
+    function startRandomQouteRefresh() {
+      if (randomQouteTimer) clearInterval(randomQouteTimer);
+      randomQouteTimer = setInterval(showRandomQoute, 5000);
+    }
+
+    function stopRandomQouteRefresh() {
+      if (randomQouteTimer) clearInterval(randomQouteTimer);
+    }
+
+    function renderTable() {
+      const tbody = document.querySelector('#jokesTable tbody');
+      tbody.innerHTML = '';
+      const search = document.getElementById('searchInput').value.toLowerCase().trim();
+      let filtered = jokesData.filter(j => j.text.toLowerCase().includes(search));
+      filtered.sort((a,b) => sortAsc ? a.id - b.id : b.id - a.id);
+
+      const pageSize = parseInt(document.getElementById('pageSize').value);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      if (page > totalPages) page = totalPages;
+      document.getElementById('pageNum').textContent = page;
+
+      const start = (page-1) * pageSize;
+      const pageItems = filtered.slice(start, start + pageSize);
+
+      for (const j of pageItems) {
+        const tr = document.createElement('tr');
+        tr.className = 'qoute-row';
+        tr.innerHTML = `
+          <td>${j.id}</td>
+          <td class="joketext">${escapeHtml(j.text)}</td>
+          <td class="actions">
+            <button onclick="openEdit(${j.id})">Edit</button>
+            <button onclick="confirmDelete(${j.id})">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function toggleSort() {
+      sortAsc = !sortAsc;
+      document.getElementById('sortDir').textContent = sortAsc ? '↑' : '↓';
+      renderTable();
+    }
+
+    function prevPage() {
+      if (page > 1) { page--; renderTable(); }
+    }
+    function nextPage() {
+      const pageSize = parseInt(document.getElementById('pageSize').value);
+      const filtered = jokesData.filter(j => j.text.toLowerCase().includes(document.getElementById('searchInput').value.toLowerCase().trim()));
+      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      if (page < totalPages) { page++; renderTable(); }
+    }
+
+    async function addQoute() {
+      const text = document.getElementById('newQouteText').value.trim();
+      const errEl = document.getElementById('formError');
+      errEl.style.display = 'none';
+      if (text.length < 3) {
+        errEl.textContent = 'Qoute must be at least 3 characters.';
+        errEl.style.display = 'block';
+        return;
+      }
+      try {
+        document.getElementById('addBtn').disabled = true;
+        const res = await fetch('/jokes', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({text})
+        });
+        if (res.status === 201) {
+          const newJ = await res.json();
+          showToast('Qoute added');
+          document.getElementById('newQouteText').value = '';
+          await fetchQoutes();
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Failed to add');
+        }
+      } catch (e) {
+        showToast('Failed to add joke');
+        console.error(e);
+      } finally {
+        document.getElementById('addBtn').disabled = false;
+      }
+    }
+
+    function openEdit(id) {
+      const j = jokesData.find(x => x.id === id);
+      if (!j) return showToast('Qoute not found');
+      document.getElementById('editId').textContent = id;
+      document.getElementById('editText').value = j.text;
+      document.getElementById('editModal').style.display = 'block';
+    }
+
+    function closeEdit() {
+      document.getElementById('editModal').style.display = 'none';
+    }
+
+    async function saveEdit() {
+      const id = parseInt(document.getElementById('editId').textContent);
+      const text = document.getElementById('editText').value.trim();
+      if (text.length < 3) return showToast('Qoute must be at least 3 characters.');
+      try {
+        const res = await fetch(`/jokes/${id}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({text})
+        });
+        if (res.status === 200) {
+          showToast('Saved');
+          closeEdit();
+          await fetchQoutes();
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Failed to save');
+        }
+      } catch (e) {
+        showToast('Failed to save');
+        console.error(e);
+      }
+    }
+
+    async function confirmDelete(id) {
+      if (!confirm(`Delete joke ${id}?`)) return;
+      try {
+        const res = await fetch(`/jokes/${id}`, { method: 'DELETE' });
+        if (res.status === 200) {
+          showToast('Deleted');
+          await fetchQoutes();
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Failed to delete');
+        }
+      } catch (e) {
+        showToast('Failed to delete');
+        console.error(e);
+      }
+    }
+
+    function showToast(msg, timeout=2500) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', timeout);
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // Auto-refresh setup
+    document.getElementById('autoRefresh').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        autoRefreshTimer = setInterval(fetchQoutes, 10000);
+      } else {
+        clearInterval(autoRefreshTimer);
+      }
+    });
+
+    // initial load
+    window.addEventListener('load', () => {
+      fetchQoutes();
+      startRandomQouteRefresh();
+    });
+  // Stop random qoute refresh on page unload
+  window.addEventListener('beforeunload', stopRandomQouteRefresh);
+  </script>
+</body>
+</html>
