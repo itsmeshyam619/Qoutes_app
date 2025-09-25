@@ -31,7 +31,7 @@ A simple web application to view, add, edit, and delete DevOps jokes and motivat
 1. Clone the repository:
     ```shell
     git clone https://github.com/itsmeshyam619/Qoutes_app.git
-    cd devops-jokes-app
+    cd Qoutes_app
     ```
 
 2. Install dependencies:
